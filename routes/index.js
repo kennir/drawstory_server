@@ -19,6 +19,11 @@ exports.queryGame = function(req,res){
 	game.queryGame(req,res);
 }
 
+exports.queryGamesFromUser = function(req,res){
+	console.log('queryGameForUser -> user object id is:' + req.params.uid);
+	game.queryGamesFromUser(req,res);
+}
+
 
 exports.register = function(req,res){
 	console.log('register -> email is:' + req.body.email + ' usrname is:' + req.body.username);
@@ -34,4 +39,10 @@ exports.login = function(req,res){
 exports.randomGame = function(req,res){
 	console.log('randomGame -> email is:' + req.body.email);
 	game.random(req,res);
+}
+
+
+exports.deleteGameIfNotStarted = function(req,res){
+	console.log('deleteGameIfNotStarted -> ObjectId is:' + req.params.gid);
+	game.deleteGameIfNotStarted(req,res);
 }

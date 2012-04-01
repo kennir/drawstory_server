@@ -26,11 +26,12 @@ var Question = {
 /*
  *  state:
  *  0 = waiting for another player
- *  1 = waiting draw-side get question
- *  2 = question got, waiting for playerA drawing
- *  3 = playerA uploaded painting,waiting for playerB get painting
- *  4 = painting got, waiting for playerB answering
- *  5 = playerB uploaded answering, 		// one turn over, go to 1
+ *  1 = waiting for owner paint 
+ *  2 = painting uploaded,waiting for opponent answer
+ *  3 = opponent answered 								== calculate result
+ *  4 = waiting for opponent paint
+ *  5 = painting uploaded,waiting for owner answer
+ *  6 = owner answered									==  round over, goto state 1
  */
 var GameSchema = new Schema({
 	state: Number,	
@@ -44,6 +45,16 @@ var GameSchema = new Schema({
 
 
 mongoose.model('Games', GameSchema);
+
+
+var LexiconSchema = new Schema({
+	word: String,
+	pinyin: String,
+	difficult: Number
+});
+
+mongoose.model('Lexicon',LexiconSchema);
+
 
 
 exports.UserModel = mongoose.model('Users');

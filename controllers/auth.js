@@ -29,21 +29,21 @@ exports.loginUser = function(aEmail,aPassword,cb){
 	UserModel.findOne({email: aEmail},function(err,user){
 		if(err){
 			console.log("ERROR:DB FindOne");
-			cb(AUTH_ERR_DB);
+			cb(AUTH_ERR_DB,null);
 		} else if(!user) {
 			console.log("ERROR:User doesn't existed!");
-			cb(AUTH_ERR_USERNOTFOUND);
+			cb(AUTH_ERR_USERNOTFOUND,null);
 		} else {
 			bcrypt.compare(aPassword, user.password, function(err,res) {
 	        	if(err) {
 	          		console.log("ERROR: Couldn't generate hash");
-	          		cb(AUTH_ERR_BCRYPT);
+	          		cb(AUTH_ERR_BCRYPT,null);
 	        	} else if (!res) {
 	          		console.log("Error: Passwords don't match");
-	          		cb(AUTH_ERR_PASSWORD);
+	          		cb(AUTH_ERR_PASSWORD,null);
 	        	} else {
 	          		console.log("SUCCESSED: User logined");
-					cb(AUTH_ERR_SUCCESSED);
+					cb(AUTH_ERR_SUCCESSED,user);
 	        	}
 	      });
 		}
@@ -54,10 +54,10 @@ exports.registerUser = function(aEmail,aUsername,cb){
 	UserModel.findOne({email: aEmail}, function(err,res) {
 		if(err) {
 			console.log("ERROR:DB FindOne");
-			cb(AUTH_ERR_DB,null);
+			cb(AUTH_ERR_DB,null,null);
 		} else if(res != null) {
 			console.log("ERROR:Email: " + aEmail + " existed");
-			cb(AUTH_ERR_EXISTED,null);
+			cb(AUTH_ERR_EXISTED,null,null);
 		} else {
 			bcrypt.genSalt(10, function(err,salt) {
 				if(err){
@@ -68,7 +68,7 @@ exports.registerUser = function(aEmail,aUsername,cb){
 					bcrypt.hash(password, salt, function(err, hash) {
 		            	if(err) {
 		              		console.log("ERROR:BCRYPT hash failed");
-		              		cb(AUTH_ERR_BCRYPT,null);
+		              		cb(AUTH_ERR_BCRYPT,null,null);
 		            	} else {	
 							var newUser = new UserModel({
 								email:aEmail,
@@ -78,10 +78,10 @@ exports.registerUser = function(aEmail,aUsername,cb){
 							newUser.save(function(err){
 								if(err){
 									console.log("ERROR:DB Save");
-									cb(AUTH_ERR_DB_SAVE,null);
+									cb(AUTH_ERR_DB_SAVE,null,null);
 								} else {
 									console.log("SUCCESS:Email: " + aEmail + " registed");
-									cb(AUTH_ERR_SUCCESSED,password);
+									cb(AUTH_ERR_SUCCESSED,newUser,password);
 								}
 							});	// newUser.save(function(err){
 						} 

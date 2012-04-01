@@ -10,6 +10,10 @@ var GAME_ERR_DB_SAVE		= -2;
 var GAME_ERR_USERNOTFOUND	= -3;
 var GAME_ERR_GETOBJECTID	= -4;
 var GAME_ERR_GAMENOTFOUND	= -5;
+var GAME_ERR_STARTED		= -6;
+var GAME_ERR_USERHAVENOTGAME = -7;
+var GAME_ERR_NOTOWNER 		= -8;
+var GAME_ERR_INVALIDPARAM	= -9;
 var GAME_ERR_SUCCESSED		= 0;
 
 var GAME_CREATE				= 1;
@@ -30,23 +34,24 @@ function getObjectId(aEmail,cb){
 	});
 }
 
-function jsonFromGame(aGame,cb){
-	var json = {
-		"gameid":aGame._id,
-		"owner":aGame.owner,
-		"opponent":aGame.opponent,
-		"turn":aGame.turn,
-		"draw":aGame.draw,
-		"question": {
-			"word":aGame.question.word,
-			"pinyin":aGame.question.pinyin,
-			"paintrecord":aGame.question.paintrecord,
-			"answerrecord":aGame.question.answerrecord
-		}
-	};
-	
-	cb(json);
-}
+// function jsonFromGame(aGame,cb){
+// 	var json = {
+// 		"gameid":aGame._id,
+// 		"state":aGame.state,
+// 		"owner":aGame.owner,
+// 		"opponent":aGame.opponent,
+// 		"turn":aGame.turn,
+// 		"draw":aGame.draw,
+// 		"question": {
+// 			"word":aGame.question.word,
+// 			"pinyin":aGame.question.pinyin,
+// 			"paintrecord":aGame.question.paintrecord,
+// 			"answerrecord":aGame.question.answerrecord
+// 		}
+// 	};
+// 	
+// 	cb(json);
+// }
 
 function join(aGame,aUser,cb){
 	aGame.opponent = aUser._id;
@@ -68,6 +73,39 @@ function join(aGame,aUser,cb){
 			})
 		}
 	});
+}
+
+function removeGameFromUser(aOwnerId,aGameId,cb) {
+	UserModel.findOne({_id:aOwnerId},function(err,user){
+		if(err){
+			console.log("ERROR:DB findOne");
+			cb(GAME_ERR_DB);
+		} else {
+			if(!user) {
+				console.log("ERROR:Invalid user object id");
+				cb(GAME_ERR_USERNOTFOUND);
+			} else {
+				var index = user.games.indexOf(aGameId);
+				if(index >= 0) {
+					
+					user.games.splice(index,1);
+					user.save(function(err){
+						if(err){
+							console.log("ERROR:DB Save");
+							cb(GAME_ERR_DB_SAVE);	
+						} else {
+							console.log("SUCCESSED,game removed from user at index:" + index);
+							cb(GAME_ERR_SUCCESSED);
+						}
+					})
+					
+				} else {
+					console.log("ERROR,game doesn't exist in user");
+					cb(GAME_ERR_USERHAVENOTGAME);
+				}
+			}
+		}
+	})
 }
 
 function create(aUser,cb){
@@ -110,7 +148,7 @@ function createRandomGame(aEmail,cb) {
 						console.log("SUCCESSED:try join game " + res);
 						join(res,user,cb);
 					} else {
-						console.log("SUCCESSED:try create game " + res);
+						console.log("SUCCESSED:try create game");
 						create(user,cb);
 					}
 				}
@@ -119,17 +157,69 @@ function createRandomGame(aEmail,cb) {
 	})
 }
 
+function deleteNotStartedGame(aGameId,aOwnerId,cb) {
+	GameModel.findOne({_id:aGameId},function(err,game){
+		if(err){
+			console.log("ERROR:DB findOne");
+			cb(GAME_ERR_DB);
+		} else {
+			if(game.state != 0) {
+				console.log("ERROR:Game already started");
+				cb(GAME_ERR_STARTED);
+			} else {
+				if(game.owner != aOwnerId){
+					console.log("ERROR:User not owner of game");
+					cb(GAME_ERR_NOTOWNER);
+				} else {
+					console.log("SUCCESSED:Game removed");
+					game.remove();
+					// delete game from users
+					console.log("STEP:remove game from owner: " + aOwnerId);
+					removeGameFromUser(aOwnerId,aGameId,function(err){
+						console.log("STEP:game removed from user game list");
+						cb(GAME_ERR_SUCCESSED);
+					})	
+				}
+			}
+		}
+	})
+}
 
 function query(aGameId,cb){
 	GameModel.findOne({_id:aGameId},function(err,game){
 		if(err){
-			console.log("ERROR:DB findOne");
+			console.log("ERROR:DB GameMode.findOne " + aGameId);
 			cb(GAME_ERR_DB,null);
 		} else {
-			console.log("SUCCESSED:game queried:" + game);
-			cb(GAME_ERR_SUCCESSED,game);
+			if(!game){
+				console.log("ERROR:game not found:" + game);
+				cb(GAME_ERR_GAMENOTFOUND,null);
+			} else {
+				console.log("SUCCESSED:game queried:" + game);
+				cb(GAME_ERR_SUCCESSED,game);				
+			}
 		}
 	});
+}
+
+function queryGamesFromUser(aUserId,cb){
+	UserModel.findOne({_id:aUserId},function(err,user){
+		if(err){
+			console.log("ERROR:DB UserModel.findOne + " + aUserId);
+			cb(GAME_ERR_DB,null);
+		} else {
+			if(!user){
+				console.log("ERROR:DB UserModel.findOne + " + aUserId);
+				cb(GAME_ERR_USERNOTFOUND,null);
+			} else {
+
+
+
+				
+				
+			}
+		}
+	})
 }
 
 exports.init = function(aAuth,aModels)
@@ -152,15 +242,41 @@ exports.random = function(req,res) {
 
 exports.queryGame = function(req,res){
 	if(!req.params.gid){
-		res.send({"result":false,"reason":GAME_ERR_GAMENOTFOUND});
+		res.send({"result":false,"reason":GAME_ERR_INVALIDPARAM});
 	} else {
 		query(req.params.gid,function(err,game){
 			if(err){
 				res.send({"result":false,"reason":err});
 			} else {
-				jsonFromGame(game,function(json){
-					res.send({"result":true,"game":json});
-				})
+				res.send({"result":true,"game":game});
+			}
+		})
+	}
+}
+
+exports.deleteGameIfNotStarted = function(req,res) {
+	if(!req.params.gid){
+		res.send({"result":false,"reason":GAME_ERR_INVALIDPARAM});
+	} else { 
+		deleteNotStartedGame(req.params.gid,req.body.owner,function(err){
+			if(err) {
+				res.send({"result":false,"reason":err});
+			} else {
+				res.send({"result":true});
+			}
+		})
+	}
+}
+
+exports.queryGamesFromUser = function(req,res) {
+	if(!req.params.uid){
+		res.send({"result":false,"reason":GAME_ERR_INVALIDPARAM});
+	} else {
+		queryGamesFromUser(req.params.uid,function(err,gamesJson){
+			if(err){
+				res.send({"result":false,"reason":err});
+			} else {
+				res.send({"result":true,"games":gamesJson});
 			}
 		})
 	}

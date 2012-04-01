@@ -39,10 +39,13 @@ routes.init(auth,models);
 
 app.get('/', routes.index);
 app.get('/game/:gid', routes.queryGame)
+app.get('/user/games/:uid', routes.queryGamesFromUser)
 
 app.post('/register', routes.register);
 app.post('/login', routes.login);
 app.post('/game/random', routes.randomGame)
+
+app.del('/game/:gid', routes.deleteGameIfNotStarted)
 
 
 app.listen(3000);
