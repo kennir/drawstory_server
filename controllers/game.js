@@ -2,10 +2,14 @@ var auth;
 var UserModel;
 var GameModel;
 
+
+
+
 var GAME_ERR_DB 			= -1;
 var GAME_ERR_DB_SAVE		= -2;
 var GAME_ERR_USERNOTFOUND	= -3;
 var GAME_ERR_GETOBJECTID	= -4;
+var GAME_ERR_GAMENOTFOUND	= -5;
 var GAME_ERR_SUCCESSED		= 0;
 
 var GAME_CREATE				= 1;
@@ -24,6 +28,24 @@ function getObjectId(aEmail,cb){
 			cb(GAME_ERR_SUCCESSED,res);
 		}
 	});
+}
+
+function jsonFromGame(aGame,cb){
+	var json = {
+		"gameid":aGame._id,
+		"owner":aGame.owner,
+		"opponent":aGame.opponent,
+		"turn":aGame.turn,
+		"draw":aGame.draw,
+		"question": {
+			"word":aGame.question.word,
+			"pinyin":aGame.question.pinyin,
+			"paintrecord":aGame.question.paintrecord,
+			"answerrecord":aGame.question.answerrecord
+		}
+	};
+	
+	cb(json);
 }
 
 function join(aGame,aUser,cb){
@@ -97,6 +119,19 @@ function createRandomGame(aEmail,cb) {
 	})
 }
 
+
+function query(aGameId,cb){
+	GameModel.findOne({_id:aGameId},function(err,game){
+		if(err){
+			console.log("ERROR:DB findOne");
+			cb(GAME_ERR_DB,null);
+		} else {
+			console.log("SUCCESSED:game queried:" + game);
+			cb(GAME_ERR_SUCCESSED,game);
+		}
+	});
+}
+
 exports.init = function(aAuth,aModels)
 {
 	auth = aAuth;
@@ -116,5 +151,17 @@ exports.random = function(req,res) {
 }
 
 exports.queryGame = function(req,res){
-	
+	if(!req.params.gid){
+		res.send({"result":false,"reason":GAME_ERR_GAMENOTFOUND});
+	} else {
+		query(req.params.gid,function(err,game){
+			if(err){
+				res.send({"result":false,"reason":err});
+			} else {
+				jsonFromGame(game,function(json){
+					res.send({"result":true,"game":json});
+				})
+			}
+		})
+	}
 }

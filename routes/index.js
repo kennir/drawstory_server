@@ -15,8 +15,8 @@ exports.index = function(req, res){
 }
 
 exports.queryGame = function(req,res){
-	console.log('queryGame -> ObjectId is:' + req.param.gameid);
-	game.queryGame(req.res);
+	console.log('queryGame -> ObjectId is:' + req.params.gid);
+	game.queryGame(req,res);
 }
 
 

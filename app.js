@@ -38,7 +38,7 @@ routes.init(auth,models);
 // Routes
 
 app.get('/', routes.index);
-app.get('/game/:objectId', routes.queryGame)
+app.get('/game/:gid', routes.queryGame)
 
 app.post('/register', routes.register);
 app.post('/login', routes.login);

@@ -15,8 +15,8 @@ mongoose.model('Users', UserSchema);
 
 
 var Question = { 
-	question: String,
-	answer: String,
+	word: String,
+	pinyin: String,
 	
 	paintrecord: String,
 	answerrecord: String,
