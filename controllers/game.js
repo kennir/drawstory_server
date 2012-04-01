@@ -3,7 +3,7 @@ var UserModel;
 var GameModel;
 
 
-
+var GAME_MAX				= 99;
 
 var GAME_ERR_DB 			= -1;
 var GAME_ERR_DB_SAVE		= -2;
@@ -14,6 +14,7 @@ var GAME_ERR_STARTED		= -6;
 var GAME_ERR_USERHAVENOTGAME = -7;
 var GAME_ERR_NOTOWNER 		= -8;
 var GAME_ERR_INVALIDPARAM	= -9;
+var GAME_ERR_TOOMANYGAMES	= -10;
 var GAME_ERR_SUCCESSED		= 0;
 
 var GAME_CREATE				= 1;
@@ -87,27 +88,31 @@ function removeGameFromUser(aOwnerId,aGameId,cb) {
 }
 
 function create(aUser,cb){
-	var newGame = new GameModel({
-		state: 0,
-		owner: aUser._id
-	});
-	newGame.save(function(err){
-		if(err){
-			console.log("ERROR:DB Save");
-			cb(GAME_ERR_DB_SAVE,null,null);
-		} else {
-			aUser.games.push(newGame._id);
-			aUser.save(function(err){
-				if(err){
-					console.log("ERROR:DB Save");
-					cb(GAME_ERR_DB_SAVE,null,null);
-				} else {
-					console.log("SUCCESSED:random game created, waiting for another player");
-					cb(GAME_ERR_SUCCESSED,GAME_CREATE,newGame._id);
-				}
-			})
-		}
-	});
+	if(aUser.games.length > GAME_MAX){
+		cb(GAME_ERR_TOOMANYGAMES,null,null);
+	} else {
+		var newGame = new GameModel({
+			state: 0,
+			owner: aUser._id
+		});
+		newGame.save(function(err){
+			if(err){
+				console.log("ERROR:DB Save");
+				cb(GAME_ERR_DB_SAVE,null,null);
+			} else {
+				aUser.games.push(newGame._id);
+				aUser.save(function(err){
+					if(err){
+						console.log("ERROR:DB Save");
+						cb(GAME_ERR_DB_SAVE,null,null);
+					} else {
+						console.log("SUCCESSED:random game created, waiting for another player");
+						cb(GAME_ERR_SUCCESSED,GAME_CREATE,newGame._id);
+					}
+				})
+			}
+		});	
+	}
 }
 
 
@@ -211,7 +216,7 @@ function queryGamesFromUser(aUserId,cb){
 							} else {
 								games.push({
 									"opponent":opponent.email,
-									"game":game
+									"detail":game
 								});
 							}
 							
