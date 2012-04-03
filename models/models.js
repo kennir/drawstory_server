@@ -39,7 +39,7 @@ var GameSchema = new Schema({
 	opponent: ObjectId,
 	createdate: { type: Date, default: Date.now },
 	turn: { type: Number, default: 0 },		
-	draw: { type: Number, min: 0, max: 1 },
+	draw: { type: Number, min: 0, max: 1 },	// 0 indicate owner draw and 1 indicate opponent draw
 	question: Question,
 });
 
