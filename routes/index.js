@@ -46,3 +46,8 @@ exports.deleteGameIfNotStarted = function(req,res){
 	console.log('deleteGameIfNotStarted -> ObjectId is:' + req.params.gid);
 	game.deleteGameIfNotStarted(req,res);
 }
+
+exports.receivePainting = function(req,res) {
+	console.log('receivePainting -> Game is:' + req.params.gid);
+	game.receivePainting(req,res);
+}

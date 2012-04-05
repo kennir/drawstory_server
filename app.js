@@ -6,11 +6,14 @@
 var express = require('express')
   , routes = require('./routes')
   , models = require('./models/models')
-  , auth = require('./controllers/auth');
+  , auth = require('./controllers/auth')
+  , lexicon = require('./controllers/lexicon');
 
 var app = module.exports = express.createServer();
 
 auth.init(models.UserModel);
+lexicon.init(models);
+
 
 // Configuration
 
@@ -44,6 +47,8 @@ app.get('/user/games/:uid', routes.queryGamesFromUser)
 app.post('/register', routes.register);
 app.post('/login', routes.login);
 app.post('/game/random', routes.randomGame)
+
+app.post('/painting/:uid/:gid/:difficult', routes.receivePainting)
 
 app.del('/game/:gid', routes.deleteGameIfNotStarted)
 

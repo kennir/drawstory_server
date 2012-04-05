@@ -1,7 +1,9 @@
+var lexicon = require("./lexicon");
+
 var auth;
 var UserModel;
 var GameModel;
-
+var PaintingRecordModel;
 
 var GAME_MAX				= 99;
 
@@ -15,6 +17,8 @@ var GAME_ERR_USERHAVENOTGAME = -7;
 var GAME_ERR_NOTOWNER 		= -8;
 var GAME_ERR_INVALIDPARAM	= -9;
 var GAME_ERR_TOOMANYGAMES	= -10;
+var GAME_ERR_LEXICONERROR	= -11;
+var GAME_ERR_PAINTRECORDNOTFOUND = 12;
 var GAME_ERR_SUCCESSED		= 0;
 
 var GAME_CREATE				= 1;
@@ -87,31 +91,57 @@ function removeGameFromUser(aOwnerId,aGameId,cb) {
 	}) // UserModel.findById(aOwnerId,function(err,user)
 }
 
+function prepareQuestion(cb) {
+	lexicon.generate(function(err,words){
+		if(err) {
+			console.log("ERR:Can't generate question");
+			cb(GAME_ERR_LEXICONERROR,null);
+		} else {
+			var question = {
+				words:words,
+				paint:null,
+				answer:null,
+			};
+			cb(GAME_ERR_SUCCESSED,question);
+		}
+	})
+}
+
 function create(aUser,cb){
 	if(aUser.games.length > GAME_MAX){
 		cb(GAME_ERR_TOOMANYGAMES,null,null);
 	} else {
-		var newGame = new GameModel({
-			state: 0,
-			owner: aUser._id
-		});
-		newGame.save(function(err){
-			if(err){
-				console.log("ERROR:DB Save");
-				cb(GAME_ERR_DB_SAVE,null,null);
+		prepareQuestion(function(err,question){
+			if(err) {
+				console.log("ERROR:Can't generate question!");
+				cb(GAME_ERR_LEXICONERROR,null,null);
 			} else {
-				aUser.games.push(newGame._id);
-				aUser.save(function(err){
+				var newGame = new GameModel({
+					state: 0,
+					question:question,
+					drawer:0,
+					turn:1,
+					owner: aUser._id
+				});
+				newGame.save(function(err){
 					if(err){
 						console.log("ERROR:DB Save");
 						cb(GAME_ERR_DB_SAVE,null,null);
 					} else {
-						console.log("SUCCESSED:random game created, waiting for another player");
-						cb(GAME_ERR_SUCCESSED,GAME_CREATE,newGame._id);
+						aUser.games.push(newGame._id);
+						aUser.save(function(err){
+							if(err){
+								console.log("ERROR:DB Save");
+								cb(GAME_ERR_DB_SAVE,null,null);
+							} else {
+								console.log("SUCCESSED:random game created, waiting for another player");
+								cb(GAME_ERR_SUCCESSED,GAME_CREATE,newGame._id);
+							}
+						})
 					}
-				})
+				});
 			}
-		});	
+		})
 	}
 }
 
@@ -127,7 +157,7 @@ function createRandomGame(aEmail,cb) {
 					console.log("ERROR:DB findOne");
 					cb(GAME_ERR_DB,null,null);
 				} else if(res){
-					console.log("SUCCESSED:try join game " + res);
+					console.log("SUCCESSED:try join game");
 					join(res,user,cb);
 				} else {
 					console.log("SUCCESSED:try create game");
@@ -175,10 +205,10 @@ function query(aGameId,cb){
 			console.log("ERROR:DB GameMode.findOne " + aGameId);
 			cb(GAME_ERR_DB,null);
 		} else if(!game){
-			console.log("ERROR:game not found:" + game);
+			console.log("ERROR:game not found:");
 			cb(GAME_ERR_GAMENOTFOUND,null);
 		} else {
-			console.log("SUCCESSED:game queried:" + game);
+			console.log("SUCCESSED:game found:");
 			cb(GAME_ERR_SUCCESSED,game);				
 		}
 	});
@@ -195,13 +225,13 @@ function queryGamesFromUser(aUserId,cb){
 		} else {
 			var games = new Array()
 			var count = user.games.length;
-			
 			user.games.forEach(function(gid){
 				GameModel.findById(gid,function(err,game){
 					if(err){
 						console.log("WARNNING:DB findOne");
 					} else if(!game){
 						console.log("WARNNING:Can't find game");
+						--count;
 					} else {
 						var opponentId;
 						if(aUserId == game.owner) {
@@ -221,27 +251,95 @@ function queryGamesFromUser(aUserId,cb){
 							}
 							
 							--count;
-							if(!count){
+							if(!count){								
 								console.log("SUCCESSED:" + games.length + " games found!");
 								cb(GAME_ERR_SUCCESSED,games);
 							}
 						}) // UserModel.findById(game.opponent,function(err,opponent)
 					}
-
-
-						
-					}) // GameModel.findById(id,function(err,game)
-				}) 	// user.games.forEach(function(gid)	
-			
+				}) // GameModel.findById(id,function(err,game)
+			}) 	// user.games.forEach(function(gid)	
 		} // else
 	}) // UserModel.findById(aUserId,function(err,user)
 }
 
-exports.init = function(aAuth,aModels)
-{
+
+function receivePainting(aUserId,aGameId,aDiff,aRecord,cb) {
+	UserModel.findById(aUserId,function(err,user){
+		if(err) {
+			console.log("ERROR:DB Error" + err);
+			cb(GAME_ERR_DB);
+		} else if(!user) {
+			console.log("ERROR:User not found");
+			cb(GAME_ERR_USERNOTFOUND);
+		} else {
+			// ok! user found
+			GameModel.findById(aGameId,function(err2,game){
+				if(err2) {
+					console.log("ERROR:DB Error" + err);
+					cb(GAME_ERR_DB);
+				} else if(!game) {
+					console.log("ERROR:Game not found");
+					cb(GAME_ERR_GAMENOTFOUND);
+				} else {
+					// Ok! game found
+					game.state = (game.state == 1) ? 2 : 1;
+					game.question.difficult = aDiff;
+					// save buffer to database
+					if(game.question.paintingid) {
+						PaintingRecordModel.findById(game.question.paintingid,function(err3,pr){
+							if(err3) {
+								console.log("ERROR:DB Error" + err);
+								cb(GAME_ERR_DB);
+							} else if(!pr) {
+								console.log("ERROR:Painting record not found");
+								game.question.paintingid = null;
+								game.save(function(err4){
+									cb(GAME_ERR_PAINTRECORDNOTFOUND);
+								});	
+							} else {
+								pr.record = aRecord;
+								pr.save(function(err4){
+									game.save(function(err){
+										console.log("SUCCESS:Painting record updated");
+										cb(GAME_ERR_SUCCESSED);
+									});	// update game state
+								})
+							}
+						}) // PaintingRecordModel.findById(game.question.paintingid,cb(err3,pr)
+					} else {
+						var pr = new PaintingRecordModel({
+							gameid:aGameId,
+							record:aRecord
+						});
+						pr.save(function(err3){
+							if(err3) {
+								console.log("ERROR:DB Error" + err);
+								cb(GAME_ERR_DB);
+							} else {
+								game.question.paintingid = pr._id;
+								game.save(function(err5){
+									console.log("SUCCESS:Painting record saved");
+									cb(GAME_ERR_SUCCESSED);
+								});
+							}
+						})
+					}
+				}
+			}) // GameModel.findById(aGameId,cb(err2,game)
+		}
+	})  // UserModel.findById(aUserId,cb(err,user)
+}
+
+
+
+
+exports.init = function(aAuth,aModels) {
+	lexicon.init(aModels);
 	auth = aAuth;
 	UserModel = aModels.UserModel;
 	GameModel = aModels.GameModel;
+	PaintingRecordModel = aModels.PaintingRecordModel;
 }
 
 
@@ -292,6 +390,20 @@ exports.queryGamesFromUser = function(req,res) {
 				res.send({"result":false,"reason":err});
 			} else {
 				res.send({"result":true,"games":games});
+			}
+		})
+	}
+}
+
+exports.receivePainting = function(req,res) {		
+	if(!req.params.uid || !req.params.gid || !req.params.difficult) {
+		res.send({"result":false, "reason":GAME_ERR_INVALIDPARAM});
+	} else {
+		receivePainting(req.params.uid,req.params.gid,req.params.difficult,req.body.painting,function(err){
+			if(err) {
+				res.send({"result":false,"reason":err,"gameid":req.params.gid });
+			} else {
+				res.send({"result":true,"gameid":req.params.gid});
 			}
 		})
 	}
