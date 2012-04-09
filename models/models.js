@@ -22,8 +22,7 @@ var Word = {
 var Question = { 
 	words: [Word],
 	difficult:Number,	// difficult used
-	paintingid: ObjectId,	// Id of painting record
-	answeringid: ObjectId,	// paint turun if existed
+	replayid: ObjectId,	// Id of painting record
 }
 
 
@@ -57,16 +56,19 @@ var LexiconSchema = new Schema({
 mongoose.model('Lexicon',LexiconSchema);
 
 
-var PaintingRecordSchema = new Schema({
+var ReplaySchema = new Schema({
 	gameid: ObjectId,
-	record: String,			// base64 encoded 
+	paintreplayoriginsize: Number,	// uncompressed size
+	paintreplay: String,			// base64 encoded 
+	solvereplayoriginsize: Number,
+	solvereplay: String				// base64 encoded 
 });
 
-mongoose.model('PaintingRecords',PaintingRecordSchema)
+mongoose.model('Replays',ReplaySchema)
 
 
 exports.UserModel = mongoose.model('Users');
 exports.GameModel = mongoose.model('Games');
 exports.LexiconModel = mongoose.model('Lexicon')
-exports.PaintingRecordModel = mongoose.model('PaintingRecords')
+exports.ReplayModel = mongoose.model('Replays')
 

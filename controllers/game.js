@@ -3,7 +3,7 @@ var lexicon = require("./lexicon");
 var auth;
 var UserModel;
 var GameModel;
-var PaintingRecordModel;
+var ReplayModel;
 
 var GAME_MAX				= 99;
 
@@ -18,7 +18,7 @@ var GAME_ERR_NOTOWNER 		= -8;
 var GAME_ERR_INVALIDPARAM	= -9;
 var GAME_ERR_TOOMANYGAMES	= -10;
 var GAME_ERR_LEXICONERROR	= -11;
-var GAME_ERR_PAINTRECORDNOTFOUND = 12;
+var GAME_ERR_REPLAYNOTFOUND = 12;
 var GAME_ERR_SUCCESSED		= 0;
 
 var GAME_CREATE				= 1;
@@ -119,7 +119,6 @@ function create(aUser,cb){
 				var newGame = new GameModel({
 					state: 0,
 					question:question,
-					drawer:0,
 					turn:1,
 					owner: aUser._id
 				});
@@ -264,7 +263,7 @@ function queryGamesFromUser(aUserId,cb){
 }
 
 
-function receivePainting(aUserId,aGameId,aDiff,aRecord,cb) {
+function receivePainting(aUserId,aGameId,aDiff,aOriginSize,aRecord,cb) {
 	UserModel.findById(aUserId,function(err,user){
 		if(err) {
 			console.log("ERROR:DB Error" + err);
@@ -286,19 +285,20 @@ function receivePainting(aUserId,aGameId,aDiff,aRecord,cb) {
 					game.state = (game.state == 1) ? 2 : 1;
 					game.question.difficult = aDiff;
 					// save buffer to database
-					if(game.question.paintingid) {
-						PaintingRecordModel.findById(game.question.paintingid,function(err3,pr){
+					if(game.question.replayid) {
+						ReplayModel.findById(game.question.replayid,function(err3,pr){
 							if(err3) {
 								console.log("ERROR:DB Error" + err);
 								cb(GAME_ERR_DB);
 							} else if(!pr) {
 								console.log("ERROR:Painting record not found");
-								game.question.paintingid = null;
+								game.question.replayid = null;
 								game.save(function(err4){
-									cb(GAME_ERR_PAINTRECORDNOTFOUND);
+									cb(GAME_ERR_REPLAYNOTFOUND);
 								});	
 							} else {
-								pr.record = aRecord;
+								pr.paintreplayoriginsize = aOriginSize;
+								pr.paintreplay = aRecord;
 								pr.save(function(err4){
 									game.save(function(err){
 										console.log("SUCCESS:Painting record updated");
@@ -308,16 +308,17 @@ function receivePainting(aUserId,aGameId,aDiff,aRecord,cb) {
 							}
 						}) // PaintingRecordModel.findById(game.question.paintingid,cb(err3,pr)
 					} else {
-						var pr = new PaintingRecordModel({
+						var pr = new ReplayModel({
 							gameid:aGameId,
-							record:aRecord
+							paintreplayoriginsize:aOriginSize,
+							paintreplay:aRecord
 						});
 						pr.save(function(err3){
 							if(err3) {
 								console.log("ERROR:DB Error" + err);
 								cb(GAME_ERR_DB);
 							} else {
-								game.question.paintingid = pr._id;
+								game.question.replayid = pr._id;
 								game.save(function(err5){
 									console.log("SUCCESS:Painting record saved");
 									cb(GAME_ERR_SUCCESSED);
@@ -331,6 +332,21 @@ function receivePainting(aUserId,aGameId,aDiff,aRecord,cb) {
 	})  // UserModel.findById(aUserId,cb(err,user)
 }
 
+function queryReplay(aReplayId,cb) {
+	ReplayModel.findById(aReplayId,function(err,replay){
+		if(err) {
+			console.log("ERROR:DB Error" + err);
+			cb(GAME_ERR_DB,null);
+		} else if(!replay) {
+			console.log("ERROR:GAME_ERR_REPLAYNOTFOUND");
+			cb(GAME_ERR_REPLAYNOTFOUND,null);
+		} else {
+			console.log("SUCCESSED:Replay found");
+			cb(GAME_ERR_SUCCESSED,replay);
+		}
+	})
+}
+
 
 
 
@@ -339,7 +355,7 @@ exports.init = function(aAuth,aModels) {
 	auth = aAuth;
 	UserModel = aModels.UserModel;
 	GameModel = aModels.GameModel;
-	PaintingRecordModel = aModels.PaintingRecordModel;
+	ReplayModel = aModels.ReplayModel;
 }
 
 
@@ -395,11 +411,26 @@ exports.queryGamesFromUser = function(req,res) {
 	}
 }
 
+exports.queryReplay = function(req,res) {
+	if(!req.params.rid) {
+		res.send({"result":false,"reason":GAME_ERR_INVALIDPARAM});
+	} else {
+		queryReplay(req.params.rid,function(err,replay){
+			if(err) {
+				res.send({"result":false,"reason":err});
+			} else {
+				res.send({"result":true,"replay":replay});
+			}
+		})
+	}
+}
+
 exports.receivePainting = function(req,res) {		
 	if(!req.params.uid || !req.params.gid || !req.params.difficult) {
 		res.send({"result":false, "reason":GAME_ERR_INVALIDPARAM});
 	} else {
-		receivePainting(req.params.uid,req.params.gid,req.params.difficult,req.body.painting,function(err){
+		receivePainting(req.params.uid,req.params.gid,req.params.difficult,req.body.paintingsize,req.body.painting,function(err){
+
 			if(err) {
 				res.send({"result":false,"reason":err,"gameid":req.params.gid });
 			} else {

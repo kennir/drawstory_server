@@ -24,6 +24,11 @@ exports.queryGamesFromUser = function(req,res){
 	game.queryGamesFromUser(req,res);
 }
 
+exports.queryReplay = function(req,res){
+	console.log('queryReplay -> replay id is:' + req.params.rid);
+	game.queryReplay(req,res);
+}
+
 
 exports.register = function(req,res){
 	console.log('register -> email is:' + req.body.email + ' usrname is:' + req.body.username);
